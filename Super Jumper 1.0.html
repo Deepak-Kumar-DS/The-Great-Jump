@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Jumper Pro - ULTRA MODE</title>
+
+<style>
+:root{
+--player-color:#f1c40f;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+background:#0f0f0f;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+font-family:'Arial Black',sans-serif;
+overflow:hidden;
+color:white;
+}
+
+#game-wrapper{
+position:relative;
+width:100vw;
+height:100vw;
+background:linear-gradient(to bottom,#1a2a6c,#b21f1f,#fdbb2d);
+border:5px solid #333;
+border-radius:20px;
+overflow:hidden;
+box-shadow:0 0 50px rgba(241,196,15,.2);
+transition:background 1s;
+}
+
+canvas{position:absolute;top:0;left:0;}
+
+#hud{
+position:absolute;
+top:20px;
+left:20px;
+right:20px;
+display:flex;
+gap:10px;
+justify-content:space-between;
+z-index:100;
+pointer-events:none;
+}
+
+.stat-box{
+background:rgba(0,0,0,.6);
+padding:12px 20px;
+border-radius:12px;
+border-bottom:4px solid var(--player-color);
+text-align:center;
+}
+
+.score-val{font-size:26px;}
+.label{font-size:11px;letter-spacing:2px;color:#aaa;}
+
+#overlay{
+position:absolute;
+inset:0;
+background:rgba(0,0,0,.8);
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+z-index:200;
+}
+
+.btn-start{
+padding:20px 50px;
+font-size:26px;
+background:var(--player-color);
+border:none;
+border-radius:10px;
+cursor:pointer;
+color:#000;
+font-weight:900;
+}
+
+#nitro-msg{
+position:absolute;
+bottom:50px;
+width:100%;
+text-align:center;
+color:#f1c40f;
+font-size:24px;
+display:none;
+animation:blink .5s infinite;
+}
+
+#insane-msg{
+position:absolute;
+top:70px;
+width:100%;
+text-align:center;
+color:#ff4757;
+font-size:22px;
+display:none;
+animation:blink .4s infinite;
+}
+
+@keyframes blink{50%{opacity:0;}}
+
+.shake{animation:shake .2s both;}
+@keyframes shake{
+10%,90%{transform:translateX(-1px);}
+20%,80%{transform:translateX(2px);}
+30%,50%,70%{transform:translateX(-4px);}
+40%,60%{transform:translateX(4px);}
+}
+</style>
+</head>
+
+<body>
+
+<div id="game-wrapper">
+
+<div id="hud">
+<div class="stat-box"><p class="label">SCORE</p><p id="score" class="score-val">0</p></div>
+<div class="stat-box"><p class="label">BEST</p><p id="best" class="score-val">0</p></div>
+<div class="stat-box"><p class="label">COINS</p><p id="coins" class="score-val">0</p></div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+<div id="nitro-msg">NITRO SPEED ACTIVATED!</div>
+<div id="insane-msg">⚠ INSANE SPEED ⚠</div>
+
+<div id="overlay">
+<h1 style="font-size:60px;margin-bottom:10px;color:#f1c40f;">ULTRA JUMPER</h1>
+<p style="margin-bottom:30px;">WARNING: EXTREME SPEED</p>
+<button class="btn-start" onclick="initGame()">START</button>
+</div>
+
+<button id="fullscreenBtn"
+style="
+position:absolute;
+top:10px;
+right:10px;
+z-index:999;
+padding:10px 15px;
+font-weight:bold;
+cursor:pointer;
+">
+FULLSCREEN
+</button>
+
+</div>
+
+<script>
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const bestEl=document.getElementById('best');
+const coinsEl=document.getElementById('coins');
+const overlay=document.getElementById('overlay');
+const nitroMsg=document.getElementById('nitro-msg');
+const insaneMsg=document.getElementById('insane-msg');
+const wrapper=document.getElementById('game-wrapper');
+
+function resizeGame(){
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+}
+
+GROUND_Y = window.innerHeight - 60;
+
+resizeGame();
+window.addEventListener("resize", resizeGame);
+
+let gameActive=false;
+let score=0;
+let coinScore=0;
+let highScore=localStorage.getItem('ultraJumperBest')||0;
+let speed=12;
+let frameCount=0;
+let day=false;
+bestEl.innerText=highScore;
+
+/* ---------- SOUND SYSTEM ---------- */
+const jumpSound=new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+const coinSound=new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+const crashSound=new Audio("https://actions.google.com/sounds/v1/cartoon/concussive_hit_guitar_boing.ogg");
+
+/* ---------- PLAYER ---------- */
+class Player{
+constructor(){
+this.width=50;
+this.height=50;
+this.x=80;
+this.y=GROUND_Y-this.height;
+this.vy=0;
+this.gravity=1.2;
+this.jumpStrength=-20;
+this.jumpCount=0;
+this.maxJump=2;
+this.hasShield=false;
+this.angle=0;
+}
+jump(){
+if(this.jumpCount<this.maxJump){
+this.vy=this.jumpStrength;
+this.jumpCount++;
+jumpSound.currentTime=0;
+jumpSound.play();
+if(navigator.vibrate) navigator.vibrate(30);
+}
+}
+update(){
+this.vy+=this.gravity;
+this.y+=this.vy;
+
+if(this.y>GROUND_Y-this.height){
+this.y=GROUND_Y-this.height;
+this.vy=0;
+this.jumpCount=0;
+this.angle=0;
+}else{
+this.angle+=.15;
+}
+}
+
+draw(){
+ctx.save();
+ctx.translate(this.x+this.width/2,this.y+this.height/2);
+ctx.rotate(this.angle);
+
+/* HEAD */
+ctx.fillStyle="#ffe0bd";
+ctx.beginPath();
+ctx.arc(0,-20,10,0,Math.PI*2);
+ctx.fill();
+
+/* BODY */
+ctx.strokeStyle="#f1c40f";
+ctx.lineWidth=4;
+ctx.beginPath();
+ctx.moveTo(0,-10);
+ctx.lineTo(0,20);
+ctx.stroke();
+
+/* ARMS */
+ctx.beginPath();
+ctx.moveTo(-12,0);
+ctx.lineTo(12,0);
+ctx.stroke();
+
+/* LEFT LEG */
+ctx.beginPath();
+ctx.moveTo(0,20);
+ctx.lineTo(-10,35);
+ctx.stroke();
+
+/* RIGHT LEG */
+ctx.beginPath();
+ctx.moveTo(0,20);
+ctx.lineTo(10,35);
+ctx.stroke();
+
+/* SHIELD */
+if(this.hasShield){
+ctx.strokeStyle='#00e5ff';
+ctx.lineWidth=3;
+ctx.beginPath();
+ctx.arc(0,5,28,0,Math.PI*2);
+ctx.stroke();
+}
+
+ctx.restore();
+}
+}
+
+/* ---------- OBSTACLE ---------- */
+class Obstacle{
+constructor(speed){
+this.x=canvas.width+50;
+this.width=30+Math.random()*30;
+this.height=50+Math.random()*50;
+this.y=GROUND_Y-this.height;
+this.speed=speed;
+}
+update(){this.x-=this.speed;}
+draw(){
+ctx.fillStyle='#ff4757';
+ctx.beginPath();
+ctx.moveTo(this.x,GROUND_Y);
+ctx.lineTo(this.x+this.width/2,this.y);
+ctx.lineTo(this.x+this.width,GROUND_Y);
+ctx.closePath();
+ctx.fill();
+}
+}
+
+/* ---------- COIN ---------- */
+class Coin{
+constructor(speed){
+this.x=canvas.width+50;
+this.y=GROUND_Y-120-Math.random()*120;
+this.radius=12;
+this.speed=speed;
+}
+update(){this.x-=this.speed;}
+draw(){
+ctx.fillStyle='gold';
+ctx.beginPath();
+ctx.arc(this.x,this.y,this.radius,0,Math.PI*2);
+ctx.fill();
+}
+}
+
+/* ---------- PARTICLES ---------- */
+let particles=[];
+function spawnParticles(x,y){
+for(let i=0;i<8;i++){
+particles.push({x,y,vx:Math.random()*4-2,vy:Math.random()*-3,life:30});
+}
+}
+
+let player;
+let obstacles=[];
+let coins=[];
+
+function initGame(){
+player=new Player();
+obstacles=[];
+coins=[];
+particles=[];
+score=0;
+coinScore=0;
+speed=12;
+frameCount=0;
+gameActive=true;
+overlay.style.display='none';
+nitroMsg.style.display='none';
+insaneMsg.style.display='none';
+scoreEl.innerText=0;
+coinsEl.innerText=0;
+gameLoop();
+}
+
+function gameOver(){
+gameActive=false;
+crashSound.play();
+wrapper.classList.add('shake');
+setTimeout(()=>wrapper.classList.remove('shake'),200);
+
+if(score>highScore){
+highScore=score;
+localStorage.setItem('ultraJumperBest',highScore);
+bestEl.innerText=highScore;
+}
+
+overlay.style.display='flex';
+overlay.querySelector('h1').innerText="WASTED!";
+overlay.querySelector('.btn-start').innerText="TRY AGAIN";
+}
+
+function updateDayNight(){
+if(frameCount%1200===0){
+day=!day;
+wrapper.style.background=day
+? "linear-gradient(to bottom,#4facfe,#00f2fe)"
+: "linear-gradient(to bottom,#1a2a6c,#b21f1f,#fdbb2d)";
+}
+}
+
+function gameLoop(){
+if(!gameActive) return;
+
+ctx.clearRect(0,0,canvas.width,canvas.height);
+updateDayNight();
+
+ctx.fillStyle='#222';
+ctx.fillRect(0,GROUND_Y,canvas.width,canvas.height-GROUND_Y);
+
+player.update();
+player.draw();
+
+/* spawn */
+let spawnRate=Math.max(40,100-(speed*2));
+if(frameCount%Math.floor(spawnRate)===0) obstacles.push(new Obstacle(speed));
+if(frameCount%120===0) coins.push(new Coin(speed));
+
+/* obstacles */
+for(let i=obstacles.length-1;i>=0;i--){
+let o=obstacles[i];
+o.update();
+o.draw();
+
+if(player.x<o.x+o.width-10 &&
+player.x+player.width>o.x+10 &&
+player.y+player.height>o.y+10){
+if(player.hasShield){
+player.hasShield=false;
+obstacles.splice(i,1);
+}else gameOver();
+}
+
+if(o.x+o.width<0){
+obstacles.splice(i,1);
+score++;
+scoreEl.innerText=score;
+speed+=.6;
+
+if(speed>25) insaneMsg.style.display='block';
+if(score===20){ nitroMsg.style.display='block'; speed+=5; }
+}
+}
+
+/* coins */
+for(let i=coins.length-1;i>=0;i--){
+let c=coins[i];
+c.update();
+c.draw();
+
+let dx=(player.x+25)-c.x;
+let dy=(player.y+25)-c.y;
+let dist=Math.sqrt(dx*dx+dy*dy);
+
+if(dist<c.radius+25){
+coins.splice(i,1);
+coinScore++;
+coinsEl.innerText=coinScore;
+coinSound.currentTime=0;
+coinSound.play();
+spawnParticles(c.x,c.y);
+
+if(coinScore%10===0) player.hasShield=true;
+}
+}
+
+/* particles */
+for(let i=particles.length-1;i>=0;i--){
+let p=particles[i];
+p.x+=p.vx;
+p.y+=p.vy;
+p.life--;
+ctx.fillStyle="gold";
+ctx.fillRect(p.x,p.y,3,3);
+if(p.life<=0) particles.splice(i,1);
+}
+
+frameCount++;
+requestAnimationFrame(gameLoop);
+}
+
+/* controls */
+window.addEventListener('keydown',e=>{
+if(e.code==='Space'||e.code==='ArrowUp'){
+if(gameActive) player.jump(); else initGame();
+}
+});
+
+canvas.addEventListener('touchstart',e=>{
+e.preventDefault();
+if(gameActive) player.jump(); else initGame();
+});
+</script>
+<script>
+  /* =====================================================
+🔥 ULTRA GOD MODE ADDON (SAFE MERGE)
+===================================================== */
+  
+  /* ===== VARIABLES ===== */
+  let godMode = false;
+  let slowMotion = false;
+  let combo = 0;
+  let magnetTime = 0;
+  let trails = [];
+  let bgm = new Audio("https://actions.google.com/sounds/v1/ambiences/barnyard.ogg");
+  bgm.loop = true;
+  bgm.volume = 0.4;
+  
+  /* ===== PATCH initGame ===== */
+  const __initGame = initGame;
+  initGame = function() {
+    __initGame();
+    combo = 0;
+    magnetTime = 0;
+    bgm.currentTime = 0;
+    bgm.play().catch(() => {});
+  };
+  
+  /* ===== PLAYER TRAIL EFFECT ===== */
+  const __playerDraw = Player.prototype.draw;
+  Player.prototype.draw = function() {
+    
+    // trail create
+    trails.push({
+      x: this.x + this.width / 2,
+      y: this.y + this.height / 2,
+      life: 18
+    });
+    
+    __playerDraw.call(this);
+  };
+  
+  /* ===== DRAW TRAILS ===== */
+  function drawTrails() {
+    for (let i = trails.length - 1; i >= 0; i--) {
+      let t = trails[i];
+      t.life--;
+      ctx.globalAlpha = t.life / 18;
+      ctx.fillStyle = "#f1c40f";
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      if (t.life <= 0) trails.splice(i, 1);
+    }
+  }
+  
+  /* ===== COIN MAGNET ===== */
+  const __coinUpdate = Coin.prototype.update;
+  Coin.prototype.update = function() {
+    
+    if (magnetTime > 0) {
+      let dx = (player.x + 25) - this.x;
+      let dy = (player.y + 25) - this.y;
+      this.x += dx * 0.06;
+      this.y += dy * 0.06;
+    }
+    
+    __coinUpdate.call(this);
+  };
+  
+  /* ===== PARTICLE PATCH (combo + magnet) ===== */
+  const __spawnParticles = spawnParticles;
+  spawnParticles = function(x, y) {
+    combo++;
+    magnetTime = 140;
+    __spawnParticles(x, y);
+  };
+  
+  /* ===== GAME LOOP PATCH ===== */
+  const __gameLoop = gameLoop;
+  gameLoop = function() {
+    
+    if (!gameActive) return;
+    
+    if (slowMotion) {
+      speed *= 0.985;
+    }
+    
+    // magnet timer
+    if (magnetTime > 0) magnetTime--;
+    
+    // call original
+    __gameLoop();
+    
+    // extra drawings
+    drawTrails();
+    
+    /* ===== COMBO TEXT ===== */
+    if (combo >= 5) {
+      ctx.fillStyle = "cyan";
+      ctx.font = "bold 20px Arial";
+      ctx.fillText("COMBO x" + combo, canvas.width - 190, 40);
+    }
+    
+    /* ===== GOD MODE BORDER ===== */
+    if (godMode) {
+      ctx.strokeStyle = "purple";
+      ctx.lineWidth = 6;
+      ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    }
+  };
+  
+  /* ===== GOD MODE KEYS ===== */
+  window.addEventListener("keydown", (e) => {
+    
+    // GOD MODE toggle
+    if (e.key === "g" || e.key === "G") {
+      godMode = !godMode;
+      if (player) player.hasShield = godMode;
+    }
+    
+    // slow motion
+    if (e.key === "s" || e.key === "S") {
+      slowMotion = !slowMotion;
+    }
+  });
+  
+  /* ===== SMART DIFFICULTY ===== */
+  setInterval(() => {
+    if (gameActive && speed < 45) {
+      speed += 0.15;
+    }
+  }, 4000);
+  
+  /* ===== MOBILE HAPTIC BOOST ===== */
+  canvas.addEventListener("touchstart", () => {
+    if (navigator.vibrate) navigator.vibrate([10, 20, 10]);
+  });
+</script>
+<script>
+  /* =====================================================
+👹 BOSS FIGHT SYSTEM — ULTRA MODE
+===================================================== */
+  
+  let boss = null;
+  let bossActive = false;
+  let bossHealth = 20;
+  let bossMaxHealth = 20;
+  let bossCooldown = 0;
+  
+  /* ===== BOSS CLASS ===== */
+  class Boss {
+    constructor() {
+      this.x = canvas.width + 200;
+      this.y = GROUND_Y - 140;
+      this.width = 140;
+      this.height = 140;
+      this.speed = 4;
+      this.entered = false;
+      this.attackTimer = 0;
+    }
+    
+    update() {
+      
+      // entry slide
+      if (!this.entered) {
+        this.x -= 6;
+        if (this.x < canvas.width - 220) this.entered = true;
+        return;
+      }
+      
+      // idle movement
+      this.attackTimer++;
+      
+      if (this.attackTimer > 120) {
+        spawnBossSpike();
+        this.attackTimer = 0;
+      }
+    }
+    
+    draw() {
+      ctx.fillStyle = "#8e44ad";
+      ctx.fillRect(this.x, this.y, this.width, this.height);
+      
+      // angry eyes 😈
+      ctx.fillStyle = "white";
+      ctx.fillRect(this.x + 30, this.y + 40, 20, 20);
+      ctx.fillRect(this.x + 90, this.y + 40, 20, 20);
+    }
+  }
+  
+  /* ===== BOSS SPIKE ===== */
+  function spawnBossSpike() {
+    obstacles.push({
+      x: canvas.width + 50,
+      y: GROUND_Y - 60,
+      width: 40,
+      height: 60,
+      speed: 10,
+      bossSpike: true,
+      update() { this.x -= this.speed; },
+      draw() {
+        ctx.fillStyle = "#ff00aa";
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+      }
+    });
+  }
+  
+  /* ===== HEALTH BAR ===== */
+  function drawBossHealth() {
+    
+    if (!bossActive) return;
+    
+    let w = 300;
+    let h = 18;
+    let x = canvas.width / 2 - w / 2;
+    let y = 20;
+    
+    ctx.fillStyle = "#222";
+    ctx.fillRect(x, y, w, h);
+    
+    let ratio = bossHealth / bossMaxHealth;
+    
+    ctx.fillStyle = ratio > 0.5 ? "#2ecc71" : ratio > 0.25 ? "#f1c40f" : "#e74c3c";
+    ctx.fillRect(x, y, w * ratio, h);
+    
+    ctx.strokeStyle = "#fff";
+    ctx.strokeRect(x, y, w, h);
+    
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 14px Arial";
+    ctx.fillText("BOSS", x - 55, y + 14);
+  }
+  
+  /* ===== TRIGGER BOSS ===== */
+  const __bossScoreCheck = Obstacle.prototype.update;
+  Obstacle.prototype.update = function() {
+    
+    // original
+    __bossScoreCheck.call(this);
+    
+    // trigger boss
+    if (!bossActive && score >= 50) {
+      startBossFight();
+    }
+  };
+  
+  /* ===== START BOSS ===== */
+  function startBossFight() {
+    
+    bossActive = true;
+    speed = 8;
+    insaneMsg.style.display = 'none';
+    nitroMsg.style.display = 'none';
+    
+    bossHealth = bossMaxHealth;
+    boss = new Boss();
+    
+    // warning flash
+    wrapper.classList.add("shake");
+    setTimeout(() => wrapper.classList.remove("shake"), 400);
+  }
+  
+  /* ===== PATCH GAME LOOP ===== */
+  const __bossGameLoop = gameLoop;
+  gameLoop = function() {
+    
+    if (!gameActive) return;
+    
+    __bossGameLoop();
+    
+    // boss update
+    if (bossActive && boss) {
+      
+      boss.update();
+      boss.draw();
+      drawBossHealth();
+      
+      // player jump damage
+      let px = player.x + player.width / 2;
+      let py = player.y + player.height;
+      
+      let hitX = px > boss.x && px < boss.x + boss.width;
+      let hitY = py > boss.y && py < boss.y + 40;
+      
+      if (hitX && hitY && player.vy > 0) {
+        bossHealth--;
+        player.vy = -15;
+        
+        if (navigator.vibrate) navigator.vibrate(60);
+        
+        if (bossHealth <= 0) {
+          defeatBoss();
+        }
+      }
+    }
+  };
+  
+  /* ===== DEFEAT ===== */
+  function defeatBoss() {
+    
+    bossActive = false;
+    boss = null;
+    speed += 6;
+    score += 10;
+    scoreEl.innerText = score;
+    
+    // celebration particles
+    for (let i = 0; i < 40; i++) {
+      spawnParticles(
+        canvas.width / 2 + Math.random() * 200 - 100,
+        200 + Math.random() * 100
+      );
+    }
+    
+    // shield reward
+    player.hasShield = true;
+  }
+</script>
+<script>
+  /* =====================================================
+🛒 SHOP + ⚡ POWER + 🌐 MULTI + 🧊 3D SYSTEM
+===================================================== */
+  
+  /* ---------- SAVE SYSTEM ---------- */
+  let totalCoins = Number(localStorage.getItem("ultraCoins") || 0);
+  coinsEl.innerText = totalCoins;
+  
+  function saveCoins() {
+    localStorage.setItem("ultraCoins", totalCoins);
+  }
+  
+  /* =====================================================
+  🛒 SHOP SYSTEM
+  ===================================================== */
+  
+  let shopOpen = false;
+  let doubleJumpUnlocked = false;
+  let magnetUnlocked = false;
+  
+  /* create shop button */
+  const shopBtn = document.createElement("button");
+  shopBtn.innerText = "SHOP";
+  shopBtn.style.position = "absolute";
+  shopBtn.style.bottom = "15px";
+  shopBtn.style.right = "15px";
+  shopBtn.style.zIndex = "300";
+  shopBtn.style.padding = "10px 18px";
+  shopBtn.style.fontWeight = "900";
+  shopBtn.style.cursor = "pointer";
+  wrapper.appendChild(shopBtn);
+  
+  /* shop panel */
+  const shopPanel = document.createElement("div");
+  shopPanel.style.position = "absolute";
+  shopPanel.style.inset = "0";
+  shopPanel.style.background = "rgba(0,0,0,.92)";
+  shopPanel.style.display = "none";
+  shopPanel.style.zIndex = "400";
+  shopPanel.style.padding = "40px";
+  shopPanel.innerHTML = `
+<h1 style="color:#f1c40f;margin-bottom:20px;">UPGRADE SHOP</h1>
+
+<button id="buyJump" style="margin:10px;padding:15px;">Double Jump (20)</button>
+<button id="buyMagnet" style="margin:10px;padding:15px;">Coin Magnet (30)</button>
+<button id="closeShop" style="margin:10px;padding:15px;">CLOSE</button>
+`;
+  wrapper.appendChild(shopPanel);
+  
+  /* open shop */
+  shopBtn.onclick = () => {
+    shopPanel.style.display = "block";
+    gameActive = false;
+  };
+  
+  /* close */
+  shopPanel.querySelector("#closeShop").onclick = () => {
+    shopPanel.style.display = "none";
+    gameActive = true;
+    gameLoop();
+  };
+  
+  /* buy double jump */
+  shopPanel.querySelector("#buyJump").onclick = () => {
+    if (totalCoins >= 20 && !doubleJumpUnlocked) {
+      totalCoins -= 20;
+      doubleJumpUnlocked = true;
+      saveCoins();
+      alert("Double Jump Unlocked!");
+    }
+  };
+  
+  /* buy magnet */
+  shopPanel.querySelector("#buyMagnet").onclick = () => {
+    if (totalCoins >= 30 && !magnetUnlocked) {
+      totalCoins -= 30;
+      magnetUnlocked = true;
+      saveCoins();
+      alert("Coin Magnet Unlocked!");
+    }
+  };
+  
+  /* =====================================================
+  ⚡ POWER UPS
+  ===================================================== */
+  
+  /* magnet effect */
+  function applyMagnet() {
+    
+    if (!magnetUnlocked) return;
+    
+    coins.forEach(c => {
+      let dx = (player.x + 25) - c.x;
+      let dy = (player.y + 25) - c.y;
+      let dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < 150) {
+        c.x += dx * 0.08;
+        c.y += dy * 0.08;
+      }
+    });
+  }
+  
+  /* patch player */
+  const __oldPlayerUpdate = Player.prototype.update;
+  Player.prototype.update = function() {
+    
+    if (doubleJumpUnlocked) this.maxJump = 3;
+    
+    __oldPlayerUpdate.call(this);
+  };
+  
+  /* =====================================================
+  🌐 LOCAL MULTIPLAYER (2P)
+  ===================================================== */
+  
+  let player2 = null;
+  let multiMode = false;
+  
+  function enableMultiplayer() {
+    
+    multiMode = true;
+    
+    player2 = new Player();
+    player2.x = 150;
+    player2.color = "#00ffea";
+    
+    /* override draw */
+    player2.draw = function() {
+      ctx.fillStyle = "#00ffea";
+      ctx.fillRect(this.x, this.y, this.width, this.height);
+    };
+  }
+  
+  /* controls player2 */
+  window.addEventListener("keydown", e => {
+    if (!multiMode || !player2) return;
+    
+    if (e.code === "KeyW") {
+      if (gameActive) player2.jump();
+    }
+  });
+  
+  /* patch game loop */
+  const __oldGameLoop2 = gameLoop;
+  gameLoop = function() {
+    
+    if (!gameActive) return;
+    
+    __oldGameLoop2();
+    
+    applyMagnet();
+    
+    /* draw player2 */
+    if (multiMode && player2) {
+      player2.update();
+      player2.draw();
+    }
+  };
+  
+  /* =====================================================
+  🧊 FAKE 3D EFFECT
+  ===================================================== */
+  
+  function draw3DGround() {
+    
+    let grad = ctx.createLinearGradient(0, GROUND_Y, 0, canvas.height);
+    grad.addColorStop(0, "#333");
+    grad.addColorStop(1, "#000");
+    
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
+    
+    // perspective lines
+    ctx.strokeStyle = "rgba(255,255,255,.05)";
+    for (let i = 0; i < canvas.width; i += 40) {
+      ctx.beginPath();
+      ctx.moveTo(i, GROUND_Y);
+      ctx.lineTo(canvas.width / 2, canvas.height);
+      ctx.stroke();
+    }
+  }
+  
+  /* patch again */
+  const __oldGameLoop3 = gameLoop;
+  gameLoop = function() {
+    
+    if (!gameActive) return;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    draw3DGround();
+    
+    __oldGameLoop3();
+  };
+  
+  /* =====================================================
+  💰 COIN COLLECTION PATCH
+  ===================================================== */
+  
+  const __coinPatch = spawnParticles;
+  spawnParticles = function(x, y) {
+    
+    totalCoins++;
+    coinsEl.innerText = totalCoins;
+    saveCoins();
+    
+    __coinPatch(x, y);
+  };
+  
+  /* =====================================================
+  🎮 SECRET KEY
+  ===================================================== */
+  
+  window.addEventListener("keydown", e => {
+    if (e.code === "KeyM") {
+      enableMultiplayer();
+      alert("Multiplayer Activated 😈");
+    }
+  });
+
+document.getElementById("fullscreenBtn").onclick = () => {
+
+if (!document.fullscreenElement) {
+document.documentElement.requestFullscreen();
+} else {
+document.exitFullscreen();
+}
+
+};
+
+</script>
+
+<script>
+/* ================================
+PART 1 — CORE SYSTEM UPGRADE
+================================ */
+
+/* ---------- PAUSE SYSTEM ---------- */
+let paused = false;
+
+window.addEventListener("keydown", e=>{
+if(e.key === "p" || e.key === "P"){
+paused = !paused;
+}
+});
+
+const __pauseGameLoop = gameLoop;
+gameLoop = function(){
+if(paused){
+ctx.fillStyle="rgba(0,0,0,.5)";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.fillStyle="#fff";
+ctx.font="bold 40px Arial";
+ctx.fillText("PAUSED",canvas.width/2-90,canvas.height/2);
+return;
+}
+__pauseGameLoop();
+};
+
+/* ---------- MOBILE CONTROLS ---------- */
+const jumpBtn=document.createElement("button");
+jumpBtn.innerText="JUMP";
+jumpBtn.style.position="absolute";
+jumpBtn.style.bottom="20px";
+jumpBtn.style.left="20px";
+jumpBtn.style.zIndex="500";
+jumpBtn.style.padding="20px";
+jumpBtn.style.fontWeight="900";
+wrapper.appendChild(jumpBtn);
+
+jumpBtn.addEventListener("touchstart",()=>{
+if(gameActive) player.jump();
+});
+
+/* ---------- LEVEL SYSTEM ---------- */
+ level = 1;
+ xp = 0;
+
+const levelBox=document.createElement("div");
+levelBox.style.position="absolute";
+levelBox.style.top="20px";
+levelBox.style.right="150px";
+levelBox.style.background="rgba(0,0,0,.6)";
+levelBox.style.padding="10px 20px";
+levelBox.style.borderRadius="10px";
+levelBox.innerHTML="LEVEL 1";
+wrapper.appendChild(levelBox);
+
+function addXP(val){
+xp += val;
+
+if(xp >= level*10){
+xp = 0;
+level++;
+
+levelBox.innerHTML="LEVEL " + level;
+
+speed += 1;
+
+if(navigator.vibrate) navigator.vibrate([50,30,50]);
+}
+}
+
+/* hook score increase */
+const __scorePatch = spawnParticles;
+spawnParticles = function(x,y){
+addXP(1);
+__scorePatch(x,y);
+};
+
+/* ---------- DIFFICULTY SCALE ---------- */
+setInterval(()=>{
+if(gameActive){
+speed += level * 0.05;
+}
+},3000);
+
+/* ---------- LEVEL TEXT ---------- */
+const __drawLevelLoop = gameLoop;
+gameLoop = function(){
+__drawLevelLoop();
+
+ctx.fillStyle="rgba(255,255,255,.5)";
+ctx.font="bold 14px Arial";
+ctx.fillText("XP: "+xp+"/"+(level*10),canvas.width-150,70);
+};
+</script>
+
+<script>
+/* ================================
+PART 2 — UI SYSTEM
+================================ */
+
+/* ---------- SETTINGS BUTTON ---------- */
+const settingsBtn=document.createElement("button");
+settingsBtn.innerText="⚙";
+settingsBtn.style.position="absolute";
+settingsBtn.style.top="15px";
+settingsBtn.style.right="15px";
+settingsBtn.style.zIndex="600";
+settingsBtn.style.padding="10px";
+wrapper.appendChild(settingsBtn);
+
+/* ---------- SETTINGS PANEL ---------- */
+const settingsPanel=document.createElement("div");
+settingsPanel.style.position="absolute";
+settingsPanel.style.inset="0";
+settingsPanel.style.background="rgba(0,0,0,.9)";
+settingsPanel.style.display="none";
+settingsPanel.style.zIndex="700";
+settingsPanel.style.padding="40px";
+
+settingsPanel.innerHTML=`
+<h2>SETTINGS</h2>
+<button id="soundToggle">Sound: ON</button><br><br>
+<button id="skinYellow">Yellow Skin</button><br><br>
+<button id="skinRed">Red Skin</button><br><br>
+<button id="skinBlue">Blue Skin</button><br><br>
+<button id="closeSettings">Close</button>
+`;
+
+wrapper.appendChild(settingsPanel);
+
+settingsBtn.onclick=()=>{
+settingsPanel.style.display="block";
+gameActive=false;
+};
+
+settingsPanel.querySelector("#closeSettings").onclick=()=>{
+settingsPanel.style.display="none";
+gameActive=true;
+gameLoop();
+};
+
+/* ---------- SOUND TOGGLE ---------- */
+ soundOn=true;
+
+settingsPanel.querySelector("#soundToggle").onclick=function(){
+soundOn=!soundOn;
+this.innerText="Sound: "+(soundOn?"ON":"OFF");
+
+[jumpSound,coinSound,crashSound].forEach(s=>{
+s.muted=!soundOn;
+});
+};
+
+/* ---------- SKINS ---------- */
+settingsPanel.querySelector("#skinYellow").onclick=()=>{
+document.documentElement.style.setProperty('--player-color','#f1c40f');
+localStorage.setItem("skin","yellow");
+};
+
+settingsPanel.querySelector("#skinRed").onclick=()=>{
+document.documentElement.style.setProperty('--player-color','#ff4757');
+localStorage.setItem("skin","red");
+};
+
+settingsPanel.querySelector("#skinBlue").onclick=()=>{
+document.documentElement.style.setProperty('--player-color','#00e5ff');
+localStorage.setItem("skin","blue");
+};
+
+/* ---------- LOAD SAVED SKIN ---------- */
+let savedSkin=localStorage.getItem("skin");
+
+if(savedSkin==="red")
+document.documentElement.style.setProperty('--player-color','#ff4757');
+
+if(savedSkin==="blue")
+document.documentElement.style.setProperty('--player-color','#00e5ff');
+
+</script>
+
+
+<script>
+/* ===== GLOBAL UI INIT ===== */
+
+ paused=false;
+ level=1;
+ xp=0;
+ soundOn=true;
+
+/* ===== SETTINGS BUTTON ===== */
+ settingsBtn=document.createElement("button");
+settingsBtn.innerText="⚙";
+settingsBtn.style.position="absolute";
+settingsBtn.style.top="15px";
+settingsBtn.style.right="60px";
+settingsBtn.style.zIndex="999";
+wrapper.appendChild(settingsBtn);
+
+const settingsPanel=document.createElement("div");
+settingsPanel.style.position="absolute";
+settingsPanel.style.inset="0";
+settingsPanel.style.background="rgba(0,0,0,.9)";
+settingsPanel.style.display="none";
+settingsPanel.style.zIndex="9999";
+settingsPanel.style.padding="40px";
+
+settingsPanel.innerHTML=`
+<h2>SETTINGS</h2>
+<button id="soundToggle">Sound: ON</button><br><br>
+<button id="skinRed">Red</button><br><br>
+<button id="closeSettings">Close</button>
+`;
+
+wrapper.appendChild(settingsPanel);
+
+settingsBtn.onclick=()=>{
+settingsPanel.style.display="block";
+gameActive=false;
+};
+
+settingsPanel.querySelector("#closeSettings").onclick=()=>{
+settingsPanel.style.display="none";
+gameActive=true;
+gameLoop();
+};
+
+/* ===== SOUND ===== */
+settingsPanel.querySelector("#soundToggle").onclick=function(){
+soundOn=!soundOn;
+[jumpSound,coinSound,crashSound].forEach(s=>s.muted=!soundOn);
+};
+
+/* ===== PAUSE ===== */
+window.addEventListener("keydown",e=>{
+if(e.key==="p") paused=!paused;
+});
+
+/* ===== LEVEL SYSTEM ===== */
+function addXP(){
+xp++;
+if(xp>=10){
+xp=0;
+level++;
+speed+=1;
+}
+}
+
+/* ===== PATCH SPAWN ===== */
+const spawn =spawnParticles;
+spawnParticles=function(x,y){
+addXP();
+spawn(x,y);
+};
+
+/* ===== PATCH LOOP ===== */
+
+const loop = gameLoop;
+gameLoop = function(){
+
+if(paused){
+ctx.fillStyle="rgba(0,0,0,.5)";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+ctx.fillStyle="#fff";
+ctx.fillText("PAUSED",canvas.width/2,canvas.height/2);
+return;
+}
+
+loop();
+
+ctx.fillStyle="white";
+ctx.fillText("LVL "+level,canvas.width-100,100);
+};
+
+</script>
+
+
+<script>
+
+/* ===== INTERESTING FEATURES PACK ===== */
+
+/* ===== DAILY MISSIONS ===== */
+let mission = { goal:20, reward:50, done:false };
+
+function drawMission(){
+ctx.fillStyle="white";
+ctx.font="bold 14px Arial";
+ctx.fillText("MISSION: Jump "+mission.goal,20,100);
+}
+
+const __missionLoop = gameLoop;
+gameLoop = function(){
+__missionLoop();
+
+drawMission();
+
+if(score>=mission.goal && !mission.done){
+mission.done=true;
+totalCoins+=mission.reward;
+saveCoins();
+alert("Mission Complete! +" + mission.reward + " coins");
+}
+};
+
+/* ===== WEATHER SYSTEM ===== */
+let rain=[];
+
+function spawnRain(){
+rain.push({
+x:Math.random()*canvas.width,
+y:-10,
+vy:5+Math.random()*5
+});
+}
+
+function drawRain(){
+rain.forEach((r,i)=>{
+r.y+=r.vy;
+ctx.strokeStyle="rgba(255,255,255,.3)";
+ctx.beginPath();
+ctx.moveTo(r.x,r.y);
+ctx.lineTo(r.x,r.y+10);
+ctx.stroke();
+
+if(r.y>canvas.height) rain.splice(i,1);
+});
+}
+
+setInterval(()=>{
+for(let i=0;i<5;i++) spawnRain();
+},50);
+
+const __weatherLoop = gameLoop;
+gameLoop = function(){
+__weatherLoop();
+drawRain();
+};
+
+/* ===== EXPLOSION ===== */
+function explosion(x,y){
+for(let i=0;i<40;i++){
+particles.push({
+x,y,
+vx:Math.random()*6-3,
+vy:Math.random()*-6,
+life:40
+});
+}
+}
+
+const __gameOver2 = gameOver;
+gameOver = function(){
+explosion(player.x,player.y);
+__gameOver2();
+};
+
+/* ===== ACHIEVEMENTS ===== */
+let achievements={first10:false};
+
+function checkAchievements(){
+if(score>=10 && !achievements.first10){
+achievements.first10=true;
+alert("Achievement: Runner!");
+}
+}
+
+const __achLoop = gameLoop;
+gameLoop = function(){
+__achLoop();
+checkAchievements();
+};
+
+</script>
+
+
+<script>
+/* ============================
+🔥 RAGE MODE + POWER DROPS
+============================ */
+
+let rage = 0;
+let rageActive = false;
+let powerUps = [];
+
+/* RAGE meter */
+function drawRage(){
+ctx.fillStyle="#222";
+ctx.fillRect(20,130,120,10);
+
+ctx.fillStyle="orange";
+ctx.fillRect(20,130,rage*6,10);
+
+ctx.strokeStyle="white";
+ctx.strokeRect(20,130,120,10);
+
+ctx.fillStyle="white";
+ctx.font="10px Arial";
+ctx.fillText("RAGE",20,125);
+}
+
+/* activate rage */
+function activateRage(){
+rageActive = true;
+speed += 5;
+setTimeout(()=>{
+rageActive=false;
+},4000);
+}
+
+/* power drop */
+function spawnPower(){
+powerUps.push({
+x:canvas.width,
+y:GROUND_Y-150,
+r:15,
+type:Math.random()>0.5?"shield":"slow"
+});
+}
+
+function drawPower(){
+powerUps.forEach((p,i)=>{
+ctx.fillStyle=p.type=="shield"?"cyan":"purple";
+ctx.beginPath();
+ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+ctx.fill();
+
+p.x-=speed;
+
+let dx=(player.x+25)-p.x;
+let dy=(player.y+25)-p.y;
+
+if(Math.sqrt(dx*dx+dy*dy)<30){
+
+if(p.type=="shield"){
+player.hasShield=true;
+}else{
+speed*=0.6;
+setTimeout(()=>speed*=1.6,2000);
+}
+
+powerUps.splice(i,1);
+}
+});
+}
+
+/* hook jump */
+const __jump = Player.prototype.jump;
+Player.prototype.jump = function(){
+rage++;
+if(rage>=20){
+activateRage();
+rage=0;
+}
+__jump.call(this);
+};
+
+/* loop patch */
+const __rageLoop = gameLoop;
+gameLoop = function(){
+
+__rageLoop();
+
+drawRage();
+drawPower();
+
+if(Math.random()<0.003) spawnPower();
+
+/* fire effect */
+if(rageActive){
+ctx.fillStyle="rgba(255,100,0,.2)";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+};
+</script>
+
+</body>
+</html>
