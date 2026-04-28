@@ -515,6 +515,7 @@ if(gameActive) player.jump(); else initGame();
   }
   
   /* ===== COIN MAGNET ===== */
+
   const __coinUpdate = Coin.prototype.update;
   Coin.prototype.update = function() {
     
@@ -529,6 +530,7 @@ if(gameActive) player.jump(); else initGame();
   };
   
   /* ===== PARTICLE PATCH (combo + magnet) ===== */
+
   const __spawnParticles = spawnParticles;
   spawnParticles = function(x, y) {
     combo++;
@@ -547,15 +549,19 @@ if(gameActive) player.jump(); else initGame();
     }
     
     // magnet timer
+
     if (magnetTime > 0) magnetTime--;
     
     // call original
+
     __gameLoop();
     
     // extra drawings
+
     drawTrails();
     
     /* ===== COMBO TEXT ===== */
+
     if (combo >= 5) {
       ctx.fillStyle = "cyan";
       ctx.font = "bold 20px Arial";
@@ -563,6 +569,7 @@ if(gameActive) player.jump(); else initGame();
     }
     
     /* ===== GOD MODE BORDER ===== */
+
     if (godMode) {
       ctx.strokeStyle = "purple";
       ctx.lineWidth = 6;
@@ -571,21 +578,25 @@ if(gameActive) player.jump(); else initGame();
   };
   
   /* ===== GOD MODE KEYS ===== */
+
   window.addEventListener("keydown", (e) => {
     
     // GOD MODE toggle
+
     if (e.key === "g" || e.key === "G") {
       godMode = !godMode;
       if (player) player.hasShield = godMode;
     }
     
     // slow motion
+
     if (e.key === "s" || e.key === "S") {
       slowMotion = !slowMotion;
     }
   });
   
   /* ===== SMART DIFFICULTY ===== */
+
   setInterval(() => {
     if (gameActive && speed < 45) {
       speed += 0.15;
@@ -593,11 +604,13 @@ if(gameActive) player.jump(); else initGame();
   }, 4000);
   
   /* ===== MOBILE HAPTIC BOOST ===== */
+
   canvas.addEventListener("touchstart", () => {
     if (navigator.vibrate) navigator.vibrate([10, 20, 10]);
   });
 </script>
 <script>
+
   /* =====================================================
 👹 BOSS FIGHT SYSTEM — ULTRA MODE
 ===================================================== */
@@ -623,6 +636,7 @@ if(gameActive) player.jump(); else initGame();
     update() {
       
       // entry slide
+
       if (!this.entered) {
         this.x -= 6;
         if (this.x < canvas.width - 220) this.entered = true;
@@ -643,6 +657,7 @@ if(gameActive) player.jump(); else initGame();
       ctx.fillRect(this.x, this.y, this.width, this.height);
       
       // angry eyes 😈
+
       ctx.fillStyle = "white";
       ctx.fillRect(this.x + 30, this.y + 40, 20, 20);
       ctx.fillRect(this.x + 90, this.y + 40, 20, 20);
@@ -650,6 +665,7 @@ if(gameActive) player.jump(); else initGame();
   }
   
   /* ===== BOSS SPIKE ===== */
+
   function spawnBossSpike() {
     obstacles.push({
       x: canvas.width + 50,
@@ -667,6 +683,7 @@ if(gameActive) player.jump(); else initGame();
   }
   
   /* ===== HEALTH BAR ===== */
+
   function drawBossHealth() {
     
     if (!bossActive) return;
@@ -693,19 +710,23 @@ if(gameActive) player.jump(); else initGame();
   }
   
   /* ===== TRIGGER BOSS ===== */
+
   const __bossScoreCheck = Obstacle.prototype.update;
   Obstacle.prototype.update = function() {
     
     // original
+
     __bossScoreCheck.call(this);
     
     // trigger boss
+
     if (!bossActive && score >= 50) {
       startBossFight();
     }
   };
   
   /* ===== START BOSS ===== */
+
   function startBossFight() {
     
     bossActive = true;
@@ -717,11 +738,13 @@ if(gameActive) player.jump(); else initGame();
     boss = new Boss();
     
     // warning flash
+
     wrapper.classList.add("shake");
     setTimeout(() => wrapper.classList.remove("shake"), 400);
   }
   
   /* ===== PATCH GAME LOOP ===== */
+
   const __bossGameLoop = gameLoop;
   gameLoop = function() {
     
@@ -730,6 +753,7 @@ if(gameActive) player.jump(); else initGame();
     __bossGameLoop();
     
     // boss update
+
     if (bossActive && boss) {
       
       boss.update();
@@ -737,6 +761,7 @@ if(gameActive) player.jump(); else initGame();
       drawBossHealth();
       
       // player jump damage
+
       let px = player.x + player.width / 2;
       let py = player.y + player.height;
       
@@ -757,6 +782,7 @@ if(gameActive) player.jump(); else initGame();
   };
   
   /* ===== DEFEAT ===== */
+
   function defeatBoss() {
     
     bossActive = false;
@@ -766,6 +792,7 @@ if(gameActive) player.jump(); else initGame();
     scoreEl.innerText = score;
     
     // celebration particles
+
     for (let i = 0; i < 40; i++) {
       spawnParticles(
         canvas.width / 2 + Math.random() * 200 - 100,
@@ -774,6 +801,7 @@ if(gameActive) player.jump(); else initGame();
     }
     
     // shield reward
+
     player.hasShield = true;
   }
 </script>
@@ -783,6 +811,7 @@ if(gameActive) player.jump(); else initGame();
 ===================================================== */
   
   /* ---------- SAVE SYSTEM ---------- */
+
   let totalCoins = Number(localStorage.getItem("ultraCoins") || 0);
   coinsEl.innerText = totalCoins;
   
@@ -799,6 +828,7 @@ if(gameActive) player.jump(); else initGame();
   let magnetUnlocked = false;
   
   /* create shop button */
+
   const shopBtn = document.createElement("button");
   shopBtn.innerText = "SHOP";
   shopBtn.style.position = "absolute";
@@ -811,6 +841,7 @@ if(gameActive) player.jump(); else initGame();
   wrapper.appendChild(shopBtn);
   
   /* shop panel */
+
   const shopPanel = document.createElement("div");
   shopPanel.style.position = "absolute";
   shopPanel.style.inset = "0";
@@ -828,12 +859,14 @@ if(gameActive) player.jump(); else initGame();
   wrapper.appendChild(shopPanel);
   
   /* open shop */
+
   shopBtn.onclick = () => {
     shopPanel.style.display = "block";
     gameActive = false;
   };
   
   /* close */
+
   shopPanel.querySelector("#closeShop").onclick = () => {
     shopPanel.style.display = "none";
     gameActive = true;
@@ -841,6 +874,7 @@ if(gameActive) player.jump(); else initGame();
   };
   
   /* buy double jump */
+
   shopPanel.querySelector("#buyJump").onclick = () => {
     if (totalCoins >= 20 && !doubleJumpUnlocked) {
       totalCoins -= 20;
@@ -851,6 +885,7 @@ if(gameActive) player.jump(); else initGame();
   };
   
   /* buy magnet */
+
   shopPanel.querySelector("#buyMagnet").onclick = () => {
     if (totalCoins >= 30 && !magnetUnlocked) {
       totalCoins -= 30;
@@ -865,6 +900,7 @@ if(gameActive) player.jump(); else initGame();
   ===================================================== */
   
   /* magnet effect */
+
   function applyMagnet() {
     
     if (!magnetUnlocked) return;
@@ -876,12 +912,13 @@ if(gameActive) player.jump(); else initGame();
       
       if (dist < 150) {
         c.x += dx * 0.08;
-        c.y += dy * 0.08;
+```        c.y += dy * 0.08;
       }
     });
   }
   
   /* patch player */
+
   const __oldPlayerUpdate = Player.prototype.update;
   Player.prototype.update = function() {
     
@@ -906,6 +943,7 @@ if(gameActive) player.jump(); else initGame();
     player2.color = "#00ffea";
     
     /* override draw */
+
     player2.draw = function() {
       ctx.fillStyle = "#00ffea";
       ctx.fillRect(this.x, this.y, this.width, this.height);
@@ -913,6 +951,7 @@ if(gameActive) player.jump(); else initGame();
   }
   
   /* controls player2 */
+
   window.addEventListener("keydown", e => {
     if (!multiMode || !player2) return;
     
@@ -922,6 +961,7 @@ if(gameActive) player.jump(); else initGame();
   });
   
   /* patch game loop */
+
   const __oldGameLoop2 = gameLoop;
   gameLoop = function() {
     
@@ -932,6 +972,7 @@ if(gameActive) player.jump(); else initGame();
     applyMagnet();
     
     /* draw player2 */
+
     if (multiMode && player2) {
       player2.update();
       player2.draw();
@@ -952,6 +993,7 @@ if(gameActive) player.jump(); else initGame();
     ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
     
     // perspective lines
+
     ctx.strokeStyle = "rgba(255,255,255,.05)";
     for (let i = 0; i < canvas.width; i += 40) {
       ctx.beginPath();
@@ -962,6 +1004,7 @@ if(gameActive) player.jump(); else initGame();
   }
   
   /* patch again */
+
   const __oldGameLoop3 = gameLoop;
   gameLoop = function() {
     
@@ -1012,11 +1055,13 @@ document.exitFullscreen();
 </script>
 
 <script>
+
 /* ================================
 PART 1 — CORE SYSTEM UPGRADE
 ================================ */
 
 /* ---------- PAUSE SYSTEM ---------- */
+
 let paused = false;
 
 window.addEventListener("keydown", e=>{
@@ -1040,6 +1085,7 @@ __pauseGameLoop();
 };
 
 /* ---------- MOBILE CONTROLS ---------- */
+
 const jumpBtn=document.createElement("button");
 jumpBtn.innerText="JUMP";
 jumpBtn.style.position="absolute";
@@ -1055,7 +1101,8 @@ if(gameActive) player.jump();
 });
 
 /* ---------- LEVEL SYSTEM ---------- */
- level = 1;
+
+level = 1;
  xp = 0;
 
 const levelBox=document.createElement("div");
@@ -1084,13 +1131,16 @@ if(navigator.vibrate) navigator.vibrate([50,30,50]);
 }
 
 /* hook score increase */
+
 const __scorePatch = spawnParticles;
 spawnParticles = function(x,y){
 addXP(1);
 __scorePatch(x,y);
 };
 
+
 /* ---------- DIFFICULTY SCALE ---------- */
+
 setInterval(()=>{
 if(gameActive){
 speed += level * 0.05;
@@ -1098,6 +1148,7 @@ speed += level * 0.05;
 },3000);
 
 /* ---------- LEVEL TEXT ---------- */
+
 const __drawLevelLoop = gameLoop;
 gameLoop = function(){
 __drawLevelLoop();
@@ -1114,6 +1165,7 @@ PART 2 — UI SYSTEM
 ================================ */
 
 /* ---------- SETTINGS BUTTON ---------- */
+
 const settingsBtn=document.createElement("button");
 settingsBtn.innerText="⚙";
 settingsBtn.style.position="absolute";
@@ -1124,6 +1176,7 @@ settingsBtn.style.padding="10px";
 wrapper.appendChild(settingsBtn);
 
 /* ---------- SETTINGS PANEL ---------- */
+
 const settingsPanel=document.createElement("div");
 settingsPanel.style.position="absolute";
 settingsPanel.style.inset="0";
@@ -1134,10 +1187,10 @@ settingsPanel.style.padding="40px";
 
 settingsPanel.innerHTML=`
 <h2>SETTINGS</h2>
-<button id="soundToggle">Sound: ON</button><br><br>
-<button id="skinYellow">Yellow Skin</button><br><br>
-<button id="skinRed">Red Skin</button><br><br>
-<button id="skinBlue">Blue Skin</button><br><br>
+<button id="soundToggle">Sound: ON</button><br>
+<button id="skinYellow">Yellow Skin</button><br>
+<button id="skinRed">Red Skin</button><br>
+<button id="skinBlue">Blue Skin</button><br>
 <button id="closeSettings">Close</button>
 `;
 
@@ -1155,6 +1208,7 @@ gameLoop();
 };
 
 /* ---------- SOUND TOGGLE ---------- */
+
  soundOn=true;
 
 settingsPanel.querySelector("#soundToggle").onclick=function(){
@@ -1167,6 +1221,7 @@ s.muted=!soundOn;
 };
 
 /* ---------- SKINS ---------- */
+
 settingsPanel.querySelector("#skinYellow").onclick=()=>{
 document.documentElement.style.setProperty('--player-color','#f1c40f');
 localStorage.setItem("skin","yellow");
@@ -1183,6 +1238,7 @@ localStorage.setItem("skin","blue");
 };
 
 /* ---------- LOAD SAVED SKIN ---------- */
+
 let savedSkin=localStorage.getItem("skin");
 
 if(savedSkin==="red")
@@ -1195,6 +1251,7 @@ document.documentElement.style.setProperty('--player-color','#00e5ff');
 
 
 <script>
+
 /* ===== GLOBAL UI INIT ===== */
 
  paused=false;
@@ -1203,6 +1260,7 @@ document.documentElement.style.setProperty('--player-color','#00e5ff');
  soundOn=true;
 
 /* ===== SETTINGS BUTTON ===== */
+
  settingsBtn=document.createElement("button");
 settingsBtn.innerText="⚙";
 settingsBtn.style.position="absolute";
@@ -1221,14 +1279,14 @@ settingsPanel.style.padding="40px";
 
 settingsPanel.innerHTML=`
 <h2>SETTINGS</h2>
-<button id="soundToggle">Sound: ON</button><br><br>
-<button id="skinRed">Red</button><br><br>
+<button id="soundToggle">Sound: ON</button><br>
+<button id="skinRed">Red</button><br>
 <button id="closeSettings">Close</button>
 `;
 
 wrapper.appendChild(settingsPanel);
 
-settingsBtn.onclick=()=>{
+settingsBtn.onclick = () => {
 settingsPanel.style.display="block";
 gameActive=false;
 };
@@ -1240,17 +1298,20 @@ gameLoop();
 };
 
 /* ===== SOUND ===== */
+
 settingsPanel.querySelector("#soundToggle").onclick=function(){
 soundOn=!soundOn;
 [jumpSound,coinSound,crashSound].forEach(s=>s.muted=!soundOn);
 };
 
 /* ===== PAUSE ===== */
+
 window.addEventListener("keydown",e=>{
 if(e.key==="p") paused=!paused;
 });
 
 /* ===== LEVEL SYSTEM ===== */
+
 function addXP(){
 xp++;
 if(xp>=10){
@@ -1261,6 +1322,7 @@ speed+=1;
 }
 
 /* ===== PATCH SPAWN ===== */
+
 const spawn =spawnParticles;
 spawnParticles=function(x,y){
 addXP();
@@ -1294,6 +1356,7 @@ ctx.fillText("LVL "+level,canvas.width-100,100);
 /* ===== INTERESTING FEATURES PACK ===== */
 
 /* ===== DAILY MISSIONS ===== */
+
 let mission = { goal:20, reward:50, done:false };
 
 function drawMission(){
@@ -1317,6 +1380,7 @@ alert("Mission Complete! +" + mission.reward + " coins");
 };
 
 /* ===== WEATHER SYSTEM ===== */
+
 let rain=[];
 
 function spawnRain(){
@@ -1351,6 +1415,7 @@ drawRain();
 };
 
 /* ===== EXPLOSION ===== */
+
 function explosion(x,y){
 for(let i=0;i<40;i++){
 particles.push({
@@ -1369,6 +1434,7 @@ __gameOver2();
 };
 
 /* ===== ACHIEVEMENTS ===== */
+
 let achievements={first10:false};
 
 function checkAchievements(){
@@ -1388,6 +1454,7 @@ checkAchievements();
 
 
 <script>
+
 /* ============================
 🔥 RAGE MODE + POWER DROPS
 ============================ */
@@ -1397,6 +1464,7 @@ let rageActive = false;
 let powerUps = [];
 
 /* RAGE meter */
+
 function drawRage(){
 ctx.fillStyle="#222";
 ctx.fillRect(20,130,120,10);
@@ -1413,6 +1481,7 @@ ctx.fillText("RAGE",20,125);
 }
 
 /* activate rage */
+
 function activateRage(){
 rageActive = true;
 speed += 5;
@@ -1422,6 +1491,7 @@ rageActive=false;
 }
 
 /* power drop */
+
 function spawnPower(){
 powerUps.push({
 x:canvas.width,
@@ -1458,6 +1528,7 @@ powerUps.splice(i,1);
 }
 
 /* hook jump */
+
 const __jump = Player.prototype.jump;
 Player.prototype.jump = function(){
 rage++;
@@ -1469,6 +1540,7 @@ __jump.call(this);
 };
 
 /* loop patch */
+
 const __rageLoop = gameLoop;
 gameLoop = function(){
 
@@ -1480,6 +1552,7 @@ drawPower();
 if(Math.random()<0.003) spawnPower();
 
 /* fire effect */
+
 if(rageActive){
 ctx.fillStyle="rgba(255,100,0,.2)";
 ctx.fillRect(0,0,canvas.width,canvas.height);
